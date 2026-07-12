@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>everdays</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+    }
+
+    /* Two stacked layers; we crossfade between them on each swap so a clip
+       never pops in mid-decode. Only the active layer is opaque. */
+    .layer {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      opacity: 0;
+      transition: opacity 1100ms ease-in-out;
+    }
+
+    .layer.active {
+      opacity: 1;
+    }
+
+    .layer video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Foreground clip. Fills the screen by cropping — except for square clips,
+       which are letterboxed (contain) so nothing is cut off. */
+    .layer .main {
+      object-fit: cover;
+    }
+
+    .layer.square .main {
+      object-fit: contain;
+    }
+
+    /* Ambient fill sits behind the main clip and only shows for square clips,
+       blurred and enlarged to softly fill the side bars. */
+    .layer .ambient {
+      object-fit: cover;
+      transform: scale(1.2);
+      filter: blur(48px) brightness(0.55) saturate(1.2);
+      opacity: 0;
+      transition: opacity 900ms ease;
+    }
+
+    .layer.square .ambient {
+      opacity: 1;
+    }
+
+    #day {
+      position: absolute;
+      right: clamp(1rem, 3vw, 2.5rem);
+      bottom: clamp(1rem, 3vw, 2.5rem);
+      color: #fff;
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      font-size: clamp(0.7rem, 1.6vw, 1rem);
+      font-weight: 600;
+      letter-spacing: 0.3em;
+      text-indent: 0.3em;
+      text-transform: uppercase;
+      text-shadow: 0 1px 24px rgba(0, 0, 0, 0.9);
+      user-select: none;
+      pointer-events: none;
+      opacity: 0.4;
+      transition: opacity 300ms ease;
+    }
+
+    #day.swap {
+      opacity: 0;
+      transition: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div class="layer" id="layerA">
+      <video class="ambient" playsinline muted loop preload="auto"></video>
+      <video class="main" playsinline muted preload="auto"></video>
+    </div>
+    <div class="layer" id="layerB">
+      <video class="ambient" playsinline muted loop preload="auto"></video>
+      <video class="main" playsinline muted preload="auto"></video>
+    </div>
+    <div id="day">day —</div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
