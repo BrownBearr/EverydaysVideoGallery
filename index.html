@@ -93,6 +93,129 @@
       opacity: 0;
       transition: none;
     }
+
+    /* Subtle bottom-left affordance to open the style picker. */
+    #pickerToggle {
+      position: absolute;
+      left: clamp(1rem, 3vw, 2.5rem);
+      bottom: clamp(1rem, 3vw, 2.5rem);
+      appearance: none;
+      background: none;
+      border: none;
+      color: #fff;
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      font-size: clamp(0.7rem, 1.6vw, 1rem);
+      font-weight: 600;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      text-shadow: 0 1px 24px rgba(0, 0, 0, 0.9);
+      opacity: 0.4;
+      cursor: pointer;
+      transition: opacity 300ms ease;
+    }
+
+    #pickerToggle:hover {
+      opacity: 0.85;
+    }
+
+    /* Full-screen catcher; the panel floats bottom-left. */
+    #picker {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-start;
+      padding: clamp(1rem, 3vw, 2.5rem);
+    }
+
+    #picker.hidden {
+      display: none;
+    }
+
+    .picker-inner {
+      max-width: min(520px, 90vw);
+      max-height: 70vh;
+      overflow-y: auto;
+      background: rgba(12, 12, 14, 0.82);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 1rem 1.1rem 1.2rem;
+    }
+
+    .picker-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.85rem;
+      color: rgba(255, 255, 255, 0.55);
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+    }
+
+    #allBtn {
+      appearance: none;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.75);
+      border-radius: 999px;
+      padding: 0.25rem 0.7rem;
+      font: inherit;
+      letter-spacing: 0.2em;
+      cursor: pointer;
+    }
+
+    #allBtn.on {
+      background: rgba(255, 255, 255, 0.9);
+      color: #000;
+      border-color: transparent;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .chip {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.82);
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+    }
+
+    .chip:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .chip.on {
+      background: rgba(255, 255, 255, 0.92);
+      color: #000;
+      border-color: transparent;
+    }
+
+    .chip .n {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.68rem;
+      opacity: 0.55;
+    }
+
+    .chip.on .n {
+      opacity: 0.6;
+    }
   </style>
 </head>
 <body>
@@ -106,6 +229,16 @@
       <video class="main" playsinline muted preload="auto"></video>
     </div>
     <div id="day">day —</div>
+    <button id="pickerToggle" type="button">filter</button>
+    <div id="picker" class="hidden">
+      <div class="picker-inner">
+        <div class="picker-head">
+          <span>styles</span>
+          <button id="allBtn" type="button">all</button>
+        </div>
+        <div id="chips" class="chips"></div>
+      </div>
+    </div>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
