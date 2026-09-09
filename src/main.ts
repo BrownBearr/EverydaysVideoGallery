@@ -1,7 +1,7 @@
 import clipsData from './clips.json';
 import styleData from './clip-styles.json';
 
-type Clip = { id: number; name: string };
+type Clip = { id: number; name: string; w: number; h: number };
 
 const CDN = (import.meta.env.VITE_CDN_BASE as string).replace(/\/$/, '');
 
@@ -35,6 +35,24 @@ const slugToStyle = new Map(stylesList.map((s) => [s.slug, s.style]));
 // The set of active style labels. Empty ⇒ no filter (every clip plays).
 const activeStyles = new Set<string>();
 
+// ── Fit ─────────────────────────────────────────────────────────────────────
+// Whether a clip fills the display or is shown whole inside blurred bars is a
+// question about two aspect ratios, not about squareness. Dimensions come from
+// the manifest (scripts/probe-dims.mjs) so the answer is known before the file
+// loads — early enough to pick the ambient source and to sequence by shape.
+
+// Crop this much and no more. On a 16:9 display the library splits cleanly:
+// the 337 native 16:9 clips sit at mismatch 1.0 and the next nearest is 1.11,
+// so anything in the gap works — 6% just keeps rounding error on the safe side.
+const CROP_TOLERANCE = 1.06;
+
+function fitsScreen(clip: Clip): boolean {
+  const screenAR = window.innerWidth / window.innerHeight;
+  const clipAR = clip.w / clip.h;
+  if (!Number.isFinite(clipAR) || clipAR <= 0) return true; // unsized: fill, as before
+  return Math.max(clipAR / screenAR, screenAR / clipAR) <= CROP_TOLERANCE;
+}
+
 // ── Feed ────────────────────────────────────────────────────────────────────
 // A shuffled list of the clips matching the active styles, looped forever.
 
@@ -49,12 +67,71 @@ function shuffle<T>(arr: T[]): T[] {
   return arr;
 }
 
+// Spread the shorter list evenly through the longer one. Keeps both orders
+// random while stopping either from arriving in a run.
+function interleave(a: Clip[], b: Clip[]): Clip[] {
+  if (b.length > a.length) [a, b] = [b, a];
+  if (!b.length) return a;
+  const gap = a.length / (b.length + 1);
+  const out: Clip[] = [];
+  let bi = 0;
+  for (let i = 0; i < a.length; i++) {
+    out.push(a[i]);
+    while (bi < b.length && i + 1 >= gap * (bi + 1)) out.push(b[bi++]);
+  }
+  while (bi < b.length) out.push(b[bi++]);
+  return out;
+}
+
+// One forward pass that pulls a nearby clip forward whenever two neighbours
+// share a style. Bounded lookahead — this only has to soften runs, not
+// guarantee their absence.
+function breakStyleRuns(list: Clip[]): void {
+  for (let i = 1; i < list.length; i++) {
+    const prev = styleOf.get(list[i - 1].name);
+    if (styleOf.get(list[i].name) !== prev) continue;
+    for (let j = i + 1; j < Math.min(i + 8, list.length); j++) {
+      if (styleOf.get(list[j].name) !== prev) {
+        [list[i], list[j]] = [list[j], list[i]];
+        break;
+      }
+    }
+  }
+}
+
+// ?only=1095,406 — restrict the feed to named clips. Undocumented; it exists to
+// put an awkward shape on screen on demand when checking the fit on a display.
+function onlyFilter(): Set<string> {
+  const raw = new URLSearchParams(location.search).get('only') ?? '';
+  return new Set(raw.split(',').map((t) => t.trim()).filter(Boolean));
+}
+
 function rebuildFeed(): void {
+  const only = onlyFilter();
+  if (only.size) {
+    const picked = clips.filter((c) => only.has(c.name));
+    if (picked.length) {
+      feed = shuffle(picked);
+      feedIndex = 0;
+      return;
+    }
+  }
+
   const pool = activeStyles.size
     ? clips.filter((c) => activeStyles.has(styleOf.get(c.name) ?? ''))
     : clips;
   // Guard: an all-unknown filter shouldn't leave a blank screen.
-  feed = shuffle([...(pool.length ? pool : clips)]);
+  const usable = pool.length ? pool : clips;
+
+  // A plain shuffle lets six pillarboxed clips land in a row and the frame
+  // pulses. Shuffle the full-bleed and letterboxed sets separately, then weave
+  // them, so the shape alternates while the order stays random.
+  const full: Clip[] = [];
+  const framed: Clip[] = [];
+  for (const clip of usable) (fitsScreen(clip) ? full : framed).push(clip);
+
+  feed = interleave(shuffle(full), shuffle(framed));
+  breakStyleRuns(feed);
   feedIndex = 0;
 }
 
@@ -66,7 +143,12 @@ function nextClip(): Clip {
 
 // ── Playback (two-layer ping-pong crossfade) ────────────────────────────────
 
-type Layer = { root: HTMLElement; main: HTMLVideoElement; ambient: HTMLVideoElement };
+type Layer = {
+  root: HTMLElement;
+  main: HTMLVideoElement;
+  ambient: HTMLVideoElement;
+  clip: Clip | null;
+};
 
 function layer(id: string): Layer {
   const root = document.getElementById(id) as HTMLElement;
@@ -74,14 +156,29 @@ function layer(id: string): Layer {
     root,
     main: root.querySelector('.main') as HTMLVideoElement,
     ambient: root.querySelector('.ambient') as HTMLVideoElement,
+    clip: null,
   };
 }
 
 const layers: Layer[] = [layer('layerA'), layer('layerB')];
 const dayEl = document.getElementById('day') as HTMLDivElement;
+const gateEl = document.getElementById('gate') as HTMLDivElement;
 
-// Must match the .layer opacity transition in index.html, plus a little slack.
-const FADE_MS = 1100;
+// Durations live in index.html as custom properties so the CSS transitions and
+// the JS timers can't drift apart. Read once — they don't change at runtime.
+function readMs(prop: string, fallback: number): number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(prop).trim();
+  const n = Number.parseFloat(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return raw.endsWith('ms') ? n : n * 1000;
+}
+
+const FADE_MS = readMs('--fade', 1100);
+const IDLE_MS = readMs('--idle', 4000);
+
+// How long the active clip may sit at the same timestamp before we call it
+// stalled. Comfortably longer than any buffering hiccup worth waiting through.
+const STALL_MS = 6000;
 
 // Start "active" on B so the first activate(A) treats the still-empty B as its
 // partner, rather than fighting itself over a single element.
@@ -92,25 +189,88 @@ function videoUrl(name: string): string {
   return `${CDN}/${name}.mp4`;
 }
 
-// A clip counts as square when its width and height are within 5% of equal.
-function isSquare(v: HTMLVideoElement): boolean {
-  return v.videoHeight > 0 && Math.abs(v.videoWidth / v.videoHeight - 1) < 0.05;
+// The fill is blurred past recognition, so it runs off the 480p preview the
+// bucket already carries. Decoding the full-res file twice would put four HD
+// streams on the machine during a crossfade for no visible gain.
+function ambientUrl(name: string): string {
+  return `${CDN}/${name}-480.mp4`;
 }
 
-// Point a layer at a clip and begin buffering. The ambient copy stays unloaded
-// until we learn (from metadata) that the clip is square and needs side fill.
+// Attach or detach the blurred side-fill to match the layer's current fit.
+function setFit(l: Layer, contain: boolean): void {
+  l.root.classList.toggle('fit-contain', contain);
+  if (contain) {
+    const want = ambientUrl(l.main.dataset.name ?? '');
+    if (l.ambient.src !== want) {
+      l.ambient.src = want;
+      l.ambient.load();
+    }
+  } else if (l.ambient.hasAttribute('src')) {
+    l.ambient.pause();
+    l.ambient.removeAttribute('src');
+    l.ambient.load();
+  }
+}
+
+// Point a layer at a clip and begin buffering. The shape is known from the
+// manifest, so the fit is settled here rather than waiting on loadedmetadata.
 function preload(l: Layer, clip: Clip): void {
-  l.root.classList.remove('square');
-  l.ambient.removeAttribute('src');
-  l.ambient.load();
+  l.clip = clip;
   l.main.dataset.name = clip.name;
   l.main.src = videoUrl(clip.name);
   l.main.load();
+  setFit(l, !fitsScreen(clip));
+}
+
+// ── Playback watchdog ───────────────────────────────────────────────────────
+// `ended` is the normal way forward, but it never fires for a clip that stalls
+// mid-buffer. Unattended, that's a black wall until someone notices — so we
+// also watch the clock and move on if it stops advancing.
+
+let stallTimer = 0;
+let lastTime = -1;
+
+function armWatchdog(): void {
+  window.clearInterval(stallTimer);
+  lastTime = -1;
+  stallTimer = window.setInterval(() => {
+    const v = layers[active].main;
+    if (v.paused || v.ended) return;
+    if (lastTime >= 0 && v.currentTime === lastTime) advance();
+    else lastTime = v.currentTime;
+  }, STALL_MS);
+}
+
+// ── Autoplay ────────────────────────────────────────────────────────────────
+// A blocked play() used to fall straight through to advance(), which burned the
+// whole feed in a fraction of a second. Give up after a few and ask for the one
+// gesture the browser wants.
+
+let playFailures = 0;
+
+function tryPlay(l: Layer): void {
+  void l.main
+    .play()
+    .then(() => {
+      playFailures = 0;
+      gateEl.classList.add('hidden');
+    })
+    .catch(() => {
+      if (++playFailures >= 3) {
+        gateEl.classList.remove('hidden');
+        return;
+      }
+      advance();
+    });
+  if (l.root.classList.contains('fit-contain')) {
+    l.ambient.currentTime = 0;
+    void l.ambient.play().catch(() => {});
+  }
 }
 
 // Bring a layer to the foreground: crossfade it in, fade its partner out, play
-// it (plus its ambient fill if square), update the day label, then queue the
-// next clip on the partner.
+// it (plus its ambient fill if letterboxed), dissolve the day label, then queue
+// the next clip on the partner.
 function activate(l: Layer): void {
   const partner = layers[active];
   active = layers.indexOf(l);
@@ -120,19 +280,16 @@ function activate(l: Layer): void {
   partner.main.pause();
   partner.ambient.pause();
 
-  void l.main.play().catch(() => {
-    /* If the browser blocks playback, skip ahead so we never stall. */
-    advance();
-  });
-  if (l.root.classList.contains('square')) {
-    l.ambient.currentTime = 0;
-    void l.ambient.play().catch(() => {});
-  }
+  tryPlay(l);
+  armWatchdog();
 
+  // Dip the caption out, swap the number while it's invisible, bring it back —
+  // so it dissolves along with the clip it names instead of snapping.
   dayEl.classList.add('swap');
-  dayEl.textContent = `day ${l.main.dataset.name ?? '—'}`;
-  void dayEl.offsetWidth; // commit the 0-opacity state before it transitions
-  dayEl.classList.remove('swap');
+  window.setTimeout(() => {
+    dayEl.textContent = `day ${l.main.dataset.name ?? '—'}`;
+    dayEl.classList.remove('swap');
+  }, 300);
 
   // Reserve the next clip's order now, but don't point the partner at it until
   // the partner has finished fading out — otherwise its new first frame would
@@ -144,29 +301,45 @@ function activate(l: Layer): void {
 
 // Swap to whichever layer is holding the preloaded next clip.
 function advance(): void {
+  window.clearInterval(stallTimer);
   activate(layers[1 - active]);
 }
 
 for (const l of layers) {
-  // Once we know the dimensions, wire up the ambient side-fill for square clips.
-  l.main.addEventListener('loadedmetadata', () => {
-    if (isSquare(l.main)) {
-      l.root.classList.add('square');
-      l.ambient.src = l.main.src;
-      l.ambient.load();
-    } else {
-      l.root.classList.remove('square');
-    }
-  });
   // When a clip plays to the end, move on to the preloaded one.
   l.main.addEventListener('ended', () => {
     if (layers.indexOf(l) === active) advance();
   });
-  // A missing/broken clip on the on-deck layer: re-point it at another clip.
+  // A missing or broken clip. On deck, quietly swap in another; on screen, move
+  // on immediately — otherwise `ended` never comes and the wall holds black.
   l.main.addEventListener('error', () => {
-    if (layers.indexOf(l) !== active) preload(l, nextClip());
+    if (layers.indexOf(l) === active) advance();
+    else preload(l, nextClip());
   });
 }
+
+// ── Display changes ─────────────────────────────────────────────────────────
+// The fit depends on the display's shape, so it has to survive the projector
+// renegotiating resolution or the window moving between screens. Re-fit both
+// layers in place; rebuilding the feed here would restart the sequence, so the
+// new shape split waits for the next natural rebuild.
+
+let resizeTimer = 0;
+function onResize(): void {
+  window.clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(() => {
+    for (const l of layers) {
+      if (!l.clip) continue;
+      const contain = !fitsScreen(l.clip);
+      if (contain === l.root.classList.contains('fit-contain')) continue;
+      setFit(l, contain);
+      if (contain && layers.indexOf(l) === active) void l.ambient.play().catch(() => {});
+    }
+  }, 200);
+}
+
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
 
 // ── Curation: URL <-> active styles, live switching ─────────────────────────
 
@@ -245,10 +418,76 @@ pickerToggle.addEventListener('click', () => setPicker(pickerEl.classList.contai
 document.addEventListener('keydown', (e) => {
   if (e.key === 'f' || e.key === 'F') setPicker(pickerEl.classList.contains('hidden'));
   else if (e.key === 'Escape') setPicker(false);
+  else if (e.key === 'Enter') void toggleFullscreen();
 });
 // Click outside the panel closes it.
 pickerEl.addEventListener('click', (e) => {
   if (e.target === pickerEl) setPicker(false);
+});
+
+// ── Gallery rest state ──────────────────────────────────────────────────────
+// Left alone, the wall should be nothing but video: caption, filter button and
+// cursor all fade out. Any input brings them back.
+
+let idleTimer = 0;
+
+function poke(): void {
+  document.body.classList.remove('idle');
+  window.clearTimeout(idleTimer);
+  idleTimer = window.setTimeout(() => {
+    // Don't hide the chrome out from under someone using the picker.
+    if (pickerEl.classList.contains('hidden')) document.body.classList.add('idle');
+  }, IDLE_MS);
+}
+
+for (const evt of ['mousemove', 'pointerdown', 'keydown', 'touchstart', 'wheel']) {
+  window.addEventListener(evt, poke, { passive: true });
+}
+
+// ── Kiosk ───────────────────────────────────────────────────────────────────
+
+async function toggleFullscreen(): Promise<void> {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  } catch {
+    /* Denied or unsupported — the wall runs fine windowed. */
+  }
+}
+
+// Hold the screen awake for the length of the show. The lock is dropped
+// whenever the tab is backgrounded, so re-take it on the way back.
+type WakeLockSentinel = EventTarget & { released: boolean };
+
+let wakeLock: WakeLockSentinel | null = null;
+
+async function keepAwake(): Promise<void> {
+  const api = (navigator as Navigator & {
+    wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinel> };
+  }).wakeLock;
+  if (!api) return; // Safari < 16.4 and friends
+  try {
+    const lock = await api.request('screen');
+    wakeLock = lock;
+    // Backgrounding the tab drops the lock; forget it so we re-take it later.
+    lock.addEventListener('release', () => {
+      if (wakeLock === lock) wakeLock = null;
+    });
+  } catch {
+    /* Denied — nothing to fall back to but the OS setting. */
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !wakeLock) void keepAwake();
+});
+
+// The one gesture a blocking browser wants, taken at gallery open.
+gateEl.addEventListener('click', () => {
+  playFailures = 0;
+  gateEl.classList.add('hidden');
+  void keepAwake();
+  tryPlay(layers[active]);
 });
 
 // ── Start ────────────────────────────────────────────────────────────────────
@@ -256,6 +495,8 @@ pickerEl.addEventListener('click', (e) => {
 stylesFromUrl();
 rebuildFeed();
 renderChips();
+poke();
+void keepAwake();
 
 // Seed the first layer; its partner gets filled when we activate.
 preload(layers[0], nextClip());

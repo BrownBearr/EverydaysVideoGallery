@@ -14,6 +14,14 @@
       box-sizing: border-box;
     }
 
+    :root {
+      /* Crossfade length. main.ts reads this off the computed style, so the
+         swap timing and the CSS transition can never drift apart. */
+      --fade: 1100ms;
+      /* How long the wall sits untouched before the chrome and cursor go away. */
+      --idle: 4000ms;
+    }
+
     html, body {
       width: 100%;
       height: 100%;
@@ -33,7 +41,7 @@
       inset: 0;
       background: #000;
       opacity: 0;
-      transition: opacity 1100ms ease-in-out;
+      transition: opacity var(--fade) ease-in-out;
     }
 
     .layer.active {
@@ -47,27 +55,51 @@
       height: 100%;
     }
 
-    /* Foreground clip. Fills the screen by cropping — except for square clips,
-       which are letterboxed (contain) so nothing is cut off. */
+    /* Foreground clip. Fills the screen by cropping when the clip's shape is
+       within CROP_TOLERANCE of the display's; otherwise main.ts adds
+       .fit-contain and the clip is shown whole with the bars filled below. */
     .layer .main {
       object-fit: cover;
     }
 
-    .layer.square .main {
+    .layer.fit-contain .main {
       object-fit: contain;
     }
 
-    /* Ambient fill sits behind the main clip and only shows for square clips,
-       blurred and enlarged to softly fill the side bars. */
+    /* Ambient fill sits behind the main clip and only shows when the clip is
+       letterboxed, blurred and enlarged to softly light the bars. The blur
+       scales with the surface — a fixed radius reads as a recognisable second
+       copy of the video once it's on a projector. */
     .layer .ambient {
       object-fit: cover;
       transform: scale(1.2);
-      filter: blur(48px) brightness(0.55) saturate(1.2);
+      filter: blur(clamp(24px, 4vw, 90px)) brightness(0.55) saturate(1.2);
       opacity: 0;
       transition: opacity 900ms ease;
     }
 
-    .layer.square .ambient {
+    .layer.fit-contain .ambient {
+      opacity: 1;
+    }
+
+    /* Corner falloff, painted over the ambient fill and under the clip itself.
+       Projectors bloom at the edges; this keeps the bars from glowing without
+       touching a single pixel of the video. Only present when there are bars. */
+    .layer .vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 900ms ease;
+      background: radial-gradient(
+        ellipse at center,
+        rgba(0, 0, 0, 0) 40%,
+        rgba(0, 0, 0, 0.28) 75%,
+        rgba(0, 0, 0, 0.55) 100%
+      );
+    }
+
+    .layer.fit-contain .vignette {
       opacity: 1;
     }
 
@@ -89,9 +121,10 @@
       transition: opacity 300ms ease;
     }
 
+    /* Held at zero while the video crossfades, so the caption dissolves with
+       the clip it names rather than snapping to the new number mid-swap. */
     #day.swap {
       opacity: 0;
-      transition: none;
     }
 
     /* Subtle bottom-left affordance to open the style picker. */
@@ -116,6 +149,16 @@
 
     #pickerToggle:hover {
       opacity: 0.85;
+    }
+
+    /* Gallery rest state. */
+    body.idle {
+      cursor: none;
+    }
+
+    body.idle #day,
+    body.idle #pickerToggle {
+      opacity: 0;
     }
 
     /* Full-screen catcher; the panel floats bottom-left. */
@@ -216,16 +259,41 @@
     .chip.on .n {
       opacity: 0.6;
     }
+
+    /* Shown only if the browser refuses to autoplay. One tap at gallery open
+       satisfies the gesture requirement and it never returns. */
+    #gate {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: rgba(255, 255, 255, 0.55);
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      font-size: clamp(0.7rem, 1.6vw, 1rem);
+      font-weight: 600;
+      letter-spacing: 0.3em;
+      text-indent: 0.3em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    #gate.hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
   <div id="stage">
     <div class="layer" id="layerA">
       <video class="ambient" playsinline muted loop preload="auto"></video>
+      <div class="vignette"></div>
       <video class="main" playsinline muted preload="auto"></video>
     </div>
     <div class="layer" id="layerB">
       <video class="ambient" playsinline muted loop preload="auto"></video>
+      <div class="vignette"></div>
       <video class="main" playsinline muted preload="auto"></video>
     </div>
     <div id="day">day —</div>
@@ -239,6 +307,7 @@
         <div id="chips" class="chips"></div>
       </div>
     </div>
+    <div id="gate" class="hidden">touch to begin</div>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
