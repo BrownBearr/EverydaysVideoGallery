@@ -10,12 +10,21 @@ Read this before planning a change to playback, fit, or sequencing.
 depends on the shape being known *before* the video element loads:
 
 - `preload()` picks the fit and decides whether to attach an ambient source at
-  all, so the 337 native-16:9 clips never spin up a second decoder.
+  all, so the 433 native-16:9 clips never spin up a second decoder.
 - `rebuildFeed()` partitions by shape to weave the running order.
 
 Reading dimensions off `loadedmetadata` instead would arrive too late for both.
 **Any new clip must be run through `npm run clips:dims` or it is treated as
 full-bleed.**
+
+## Styles for new clips are assigned, not re-clustered
+
+`src/clip-styles.json` keeps the gallery's own 18-style taxonomy so `?styles=`
+URLs saved on installations keep working. daysofshivacanvas re-clusters with
+different labels — don't copy its file over. New clips are assigned to the
+nearest existing style centroid using the cached CLIP embeddings
+(`~/daysofshivacanvas/scripts/.cache/embeddings.npz`); a clip whose similarity
+falls below that style's 10th-percentile member similarity goes to `unsorted`.
 
 ## Fit is a relationship between two aspect ratios
 

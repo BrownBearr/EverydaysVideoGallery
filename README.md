@@ -27,7 +27,8 @@ racing through the feed. One tap at opening covers the whole run.
 
 ## Aspect ratios
 
-Clip shapes in the library range from 406×720 to 1520×720. `src/clips.json`
+Clip shapes in the library range from 406×720 to 1520×720 (most sources are
+720p; some newer clips are 1920×1080 or 1920×1920). `src/clips.json`
 carries each clip's pixel dimensions so the renderer knows the shape before the
 file loads. A clip fills the screen when its aspect ratio is within
 `CROP_TOLERANCE` (6%) of the display's; otherwise it is shown whole and a

@@ -6,37 +6,37 @@
       "id": -1,
       "style": "unsorted",
       "description": "Outliers that didn't fall into any style cluster.",
-      "count": 82
+      "count": 105
     },
     {
       "id": 0,
       "style": "High-Contrast Graphic",
       "description": "Stark, limited-palette graphic scenes \u2014 ink line work, white silhouettes on black, and duotone/halftone or desaturated gritty cityscapes, unified by heavy contrast and bold figure-and-environment composition.",
-      "count": 93
+      "count": 98
     },
     {
       "id": 1,
       "style": "Radial Speed Burst",
       "description": "Explosive radial motion lines bursting from a center; purple/magenta shards on black and white.",
-      "count": 38
+      "count": 45
     },
     {
       "id": 2,
       "style": "Monochrome Particle Field",
       "description": "Dense single-colour particle clouds forming a soft volume against a flat background.",
-      "count": 73
+      "count": 76
     },
     {
       "id": 3,
       "style": "Grayscale Wireframe",
       "description": "Thin grayscale line and wireframe geometry \u2014 swirling curves and lattices on black.",
-      "count": 22
+      "count": 25
     },
     {
       "id": 4,
       "style": "Neon 3D Render",
       "description": "Clean glossy 3D objects lit with saturated cyan/blue neon gradients on a dark stage.",
-      "count": 11
+      "count": 12
     },
     {
       "id": 5,
@@ -60,13 +60,13 @@
       "id": 8,
       "style": "Confetti Shards",
       "description": "Sharp angular confetti flakes scattered in bright colour across a dark field.",
-      "count": 12
+      "count": 14
     },
     {
       "id": 9,
       "style": "Cel-Shaded Cartoon",
       "description": "Flat cel-shaded interiors and scenes with bold outlines and a single colour wash.",
-      "count": 23
+      "count": 25
     },
     {
       "id": 10,
@@ -78,19 +78,19 @@
       "id": 11,
       "style": "Holographic Iridescent",
       "description": "Crinkled holographic foil abstractions \u2014 iridescent blue, pink and pearl sheen.",
-      "count": 26
+      "count": 29
     },
     {
       "id": 12,
       "style": "Voxel / Pixelated",
       "description": "Voxel and pixelated forms \u2014 blocky cubes assembling into nature and objects.",
-      "count": 13
+      "count": 19
     },
     {
       "id": 13,
       "style": "Painterly Landscape",
       "description": "Soft oil-filter landscapes \u2014 sea, sky and grass with smooth painterly blending.",
-      "count": 22
+      "count": 53
     },
     {
       "id": 14,
@@ -102,19 +102,19 @@
       "id": 15,
       "style": "Impressionist Foliage",
       "description": "Dabbed impressionist brushwork, foliage and trees in mottled colour.",
-      "count": 39
+      "count": 66
     },
     {
       "id": 16,
       "style": "Stylized Painterly Nature",
       "description": "Lush stylized painted nature scenes \u2014 flower meadows and tree groves, warm light.",
-      "count": 12
+      "count": 13
     },
     {
       "id": 17,
       "style": "Realistic 3D Landscape",
       "description": "Semi-photoreal 3D terrain renders \u2014 water, rock and moss with naturalistic light.",
-      "count": 34
+      "count": 38
     }
   ],
   "images": [
@@ -3513,6 +3513,714 @@
       "file": "1723.jpg",
       "cluster": 2,
       "style": "Monochrome Particle Field"
+    },
+    {
+      "name": "1724",
+      "file": "1724.jpg",
+      "cluster": 16,
+      "style": "Stylized Painterly Nature"
+    },
+    {
+      "name": "1725",
+      "file": "1725.jpg",
+      "cluster": 12,
+      "style": "Voxel / Pixelated"
+    },
+    {
+      "name": "1726",
+      "file": "1726.jpg",
+      "cluster": 9,
+      "style": "Cel-Shaded Cartoon"
+    },
+    {
+      "name": "1727",
+      "file": "1727.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1728",
+      "file": "1728.jpg",
+      "cluster": 17,
+      "style": "Realistic 3D Landscape"
+    },
+    {
+      "name": "1729",
+      "file": "1729.jpg",
+      "cluster": 0,
+      "style": "High-Contrast Graphic"
+    },
+    {
+      "name": "1730",
+      "file": "1730.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1731",
+      "file": "1731.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1732",
+      "file": "1732.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1733",
+      "file": "1733.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1734",
+      "file": "1734.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1735",
+      "file": "1735.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1736",
+      "file": "1736.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1737",
+      "file": "1737.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1738",
+      "file": "1738.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1739",
+      "file": "1739.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1740",
+      "file": "1740.jpg",
+      "cluster": 17,
+      "style": "Realistic 3D Landscape"
+    },
+    {
+      "name": "1741",
+      "file": "1741.jpg",
+      "cluster": 12,
+      "style": "Voxel / Pixelated"
+    },
+    {
+      "name": "1742",
+      "file": "1742.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1743",
+      "file": "1743.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1744",
+      "file": "1744.jpg",
+      "cluster": 1,
+      "style": "Radial Speed Burst"
+    },
+    {
+      "name": "1745",
+      "file": "1745.jpg",
+      "cluster": 0,
+      "style": "High-Contrast Graphic"
+    },
+    {
+      "name": "1746",
+      "file": "1746.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1747",
+      "file": "1747.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1748",
+      "file": "1748.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1749",
+      "file": "1749.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1750",
+      "file": "1750.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1752",
+      "file": "1752.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1753",
+      "file": "1753.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1754",
+      "file": "1754.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1755",
+      "file": "1755.jpg",
+      "cluster": 12,
+      "style": "Voxel / Pixelated"
+    },
+    {
+      "name": "1756",
+      "file": "1756.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1757",
+      "file": "1757.jpg",
+      "cluster": 12,
+      "style": "Voxel / Pixelated"
+    },
+    {
+      "name": "1758",
+      "file": "1758.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1759",
+      "file": "1759.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1760",
+      "file": "1760.jpg",
+      "cluster": 17,
+      "style": "Realistic 3D Landscape"
+    },
+    {
+      "name": "1761",
+      "file": "1761.jpg",
+      "cluster": 0,
+      "style": "High-Contrast Graphic"
+    },
+    {
+      "name": "1762",
+      "file": "1762.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1763",
+      "file": "1763.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1764",
+      "file": "1764.jpg",
+      "cluster": 17,
+      "style": "Realistic 3D Landscape"
+    },
+    {
+      "name": "1765",
+      "file": "1765.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1766",
+      "file": "1766.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1767",
+      "file": "1767.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1768",
+      "file": "1768.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1769",
+      "file": "1769.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1770",
+      "file": "1770.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1771",
+      "file": "1771.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1772",
+      "file": "1772.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1773",
+      "file": "1773.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1774",
+      "file": "1774.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1775",
+      "file": "1775.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1776",
+      "file": "1776.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1777",
+      "file": "1777.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1778",
+      "file": "1778.jpg",
+      "cluster": 11,
+      "style": "Holographic Iridescent"
+    },
+    {
+      "name": "1779",
+      "file": "1779.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1780",
+      "file": "1780.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1781",
+      "file": "1781.jpg",
+      "cluster": 11,
+      "style": "Holographic Iridescent"
+    },
+    {
+      "name": "1782",
+      "file": "1782.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1783",
+      "file": "1783.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1784",
+      "file": "1784.jpg",
+      "cluster": 2,
+      "style": "Monochrome Particle Field"
+    },
+    {
+      "name": "1785",
+      "file": "1785.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1786",
+      "file": "1786.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1787",
+      "file": "1787.jpg",
+      "cluster": 1,
+      "style": "Radial Speed Burst"
+    },
+    {
+      "name": "1788",
+      "file": "1788.jpg",
+      "cluster": 9,
+      "style": "Cel-Shaded Cartoon"
+    },
+    {
+      "name": "1789",
+      "file": "1789.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1790",
+      "file": "1790.jpg",
+      "cluster": 12,
+      "style": "Voxel / Pixelated"
+    },
+    {
+      "name": "1791",
+      "file": "1791.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1792",
+      "file": "1792.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1793",
+      "file": "1793.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1794",
+      "file": "1794.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1795",
+      "file": "1795.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1796",
+      "file": "1796.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1797",
+      "file": "1797.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1798",
+      "file": "1798.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1799",
+      "file": "1799.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1800",
+      "file": "1800.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1801",
+      "file": "1801.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1802",
+      "file": "1802.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1803",
+      "file": "1803.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1804",
+      "file": "1804.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1805",
+      "file": "1805.jpg",
+      "cluster": 11,
+      "style": "Holographic Iridescent"
+    },
+    {
+      "name": "1806",
+      "file": "1806.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1807",
+      "file": "1807.jpg",
+      "cluster": 12,
+      "style": "Voxel / Pixelated"
+    },
+    {
+      "name": "1808",
+      "file": "1808.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1809",
+      "file": "1809.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1810",
+      "file": "1810.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1811",
+      "file": "1811.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1812",
+      "file": "1812.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1813",
+      "file": "1813.jpg",
+      "cluster": 15,
+      "style": "Impressionist Foliage"
+    },
+    {
+      "name": "1814",
+      "file": "1814.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1815",
+      "file": "1815.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1816",
+      "file": "1816.jpg",
+      "cluster": 8,
+      "style": "Confetti Shards"
+    },
+    {
+      "name": "1817",
+      "file": "1817.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1818",
+      "file": "1818.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1819",
+      "file": "1819.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1820",
+      "file": "1820.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1822",
+      "file": "1822.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1823",
+      "file": "1823.jpg",
+      "cluster": 8,
+      "style": "Confetti Shards"
+    },
+    {
+      "name": "1824",
+      "file": "1824.jpg",
+      "cluster": 1,
+      "style": "Radial Speed Burst"
+    },
+    {
+      "name": "1825",
+      "file": "1825.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1826",
+      "file": "1826.jpg",
+      "cluster": 2,
+      "style": "Monochrome Particle Field"
+    },
+    {
+      "name": "1827",
+      "file": "1827.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1828",
+      "file": "1828.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1829",
+      "file": "1829.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1830",
+      "file": "1830.jpg",
+      "cluster": 2,
+      "style": "Monochrome Particle Field"
+    },
+    {
+      "name": "1831",
+      "file": "1831.jpg",
+      "cluster": -1,
+      "style": "unsorted"
+    },
+    {
+      "name": "1832",
+      "file": "1832.jpg",
+      "cluster": 0,
+      "style": "High-Contrast Graphic"
+    },
+    {
+      "name": "1833",
+      "file": "1833.jpg",
+      "cluster": 1,
+      "style": "Radial Speed Burst"
+    },
+    {
+      "name": "1834",
+      "file": "1834.jpg",
+      "cluster": 3,
+      "style": "Grayscale Wireframe"
+    },
+    {
+      "name": "1835",
+      "file": "1835.jpg",
+      "cluster": 0,
+      "style": "High-Contrast Graphic"
+    },
+    {
+      "name": "1836",
+      "file": "1836.jpg",
+      "cluster": 3,
+      "style": "Grayscale Wireframe"
+    },
+    {
+      "name": "1837",
+      "file": "1837.jpg",
+      "cluster": 13,
+      "style": "Painterly Landscape"
+    },
+    {
+      "name": "1838",
+      "file": "1838.jpg",
+      "cluster": 3,
+      "style": "Grayscale Wireframe"
+    },
+    {
+      "name": "1839",
+      "file": "1839.jpg",
+      "cluster": 1,
+      "style": "Radial Speed Burst"
+    },
+    {
+      "name": "1840",
+      "file": "1840.jpg",
+      "cluster": 1,
+      "style": "Radial Speed Burst"
+    },
+    {
+      "name": "1842",
+      "file": "1842.jpg",
+      "cluster": 1,
+      "style": "Radial Speed Burst"
+    },
+    {
+      "name": "1843",
+      "file": "1843.jpg",
+      "cluster": 4,
+      "style": "Neon 3D Render"
+    },
+    {
+      "name": "1844",
+      "file": "1844.jpg",
+      "cluster": -1,
+      "style": "unsorted"
     }
   ]
 }
