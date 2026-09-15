@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "clips:dims": "node scripts/probe-dims.mjs"
+    "clips:dims": "node scripts/probe-dims.mjs",
+    "local:fetch": "node scripts/serve-local.mjs --fetch",
+    "local:serve": "node scripts/serve-local.mjs"
   },
   "devDependencies": {
     "typescript": "~5.6.2",

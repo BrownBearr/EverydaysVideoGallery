@@ -202,3 +202,30 @@ stops a second swap being queued while one is waiting on readiness.
 
 Worth keeping as a test: poll `document.querySelector('.layer.active')` while
 hammering sync and filter toggles; it must never be null.
+
+## Many screens: sync scales, bandwidth does not
+
+Sync is derived, not communicated, so N screens cost exactly what one costs —
+no coordination traffic, no server, no N² anything. Ten instances measured
+0.03s apart with one seek each (the join).
+
+The constraint is the uplink, and sync makes it worse rather than better:
+because every screen plays the same clip at the same moment, they all request
+the *same file* at the *same time*. Measured per screen: 720p sources average
+4.8 Mbps and reach 19 Mbps on the heaviest clips; the 480p copies average
+0.43 Mbps. So ten screens is ~48 Mbps average and ~102 Mbps on heavy clips at
+720p, against ~4.3 Mbps at 480p.
+
+**A CDN does not solve this.** It offloads the origin; the screens still each
+pull a full stream over whatever connection they share. What does solve it is
+removing the internet from the path — `scripts/serve-local.mjs` downloads the
+library once and serves it over the LAN, with byte-range support (mandatory for
+video) and a long immutable cache header. Ten screens against it: 10/10 in step,
+0.02s apart, zero stalls, at full quality.
+
+`?cdn=` overrides `VITE_CDN_BASE` at runtime so a wall can be pointed at a
+local server without rebuilding.
+
+Note for multi-screen shows: the automatic quality fallback is per screen, so a
+marginal connection leaves some screens at 480p and others at 720p — visibly
+inconsistent side by side. Pin `&quality=` for a wall.

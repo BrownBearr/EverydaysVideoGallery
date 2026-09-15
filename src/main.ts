@@ -3,7 +3,16 @@ import styleData from './clip-styles.json';
 
 type Clip = { id: number; name: string; w: number; h: number; d: number };
 
-const CDN = (import.meta.env.VITE_CDN_BASE as string).replace(/\/$/, '');
+// Where the clips come from. Baked in at build time, but overridable per screen
+// with ?cdn= — which is what lets a wall of screens be pointed at a machine on
+// the local network instead of the internet, with no rebuild.
+function resolveCdn(): string {
+  const override = new URLSearchParams(location.search).get('cdn');
+  if (override && /^https?:\/\//i.test(override)) return override.replace(/\/$/, '');
+  return (import.meta.env.VITE_CDN_BASE as string).replace(/\/$/, '');
+}
+
+const CDN = resolveCdn();
 
 const clips: Clip[] = [...clipsData.clips];
 

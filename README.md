@@ -84,6 +84,46 @@ Two things follow from that design:
   fixed 16:9 reference, so a portrait monitor in fill mode still shows the same
   clip at the same moment as a 16:9 projector.
 
+### Running several screens at once
+
+Sync costs nothing to scale — every screen derives the schedule independently,
+so there is no coordination traffic and ten screens behave exactly like two.
+Measured with ten instances: all agreeing, 0.03s apart.
+
+What does not scale is bandwidth. Because they are synced, every screen pulls
+the *same* file at the *same* moment, so the venue's uplink carries the full
+multiple. Per screen the sources average 4.8 Mbps and peak near 19 Mbps on the
+heaviest clips; the 480p copies average 0.43 Mbps.
+
+| 10 screens | mean | heavy clips | worst clip |
+|---|---|---|---|
+| 720p sources | 48 Mbps | 102 Mbps | 191 Mbps |
+| 480p copies | 4.3 Mbps | 8.5 Mbps | 22 Mbps |
+
+A CDN does not fix this — it reduces load on the origin, not on the uplink the
+screens share. Two things actually do:
+
+**Serve from the local network** (best, and the internet stops mattering):
+
+```
+npm run build
+npm run local:fetch      # download the library once (~8 GB at 720p, 0.7 GB at 480p)
+npm run local:serve      # prints the URL to open on each screen
+```
+
+Every screen opens the same printed URL and pulls from this machine over the
+LAN, so ten screens at full quality is ~48 Mbps across a switch rather than an
+internet connection. Ten screens tested this way: 10/10 in step, 0.02s apart,
+zero stalls. `?cdn=` also works by hand against any local server.
+
+**Or pin the small copies** if the clips must come from the internet: add
+`&quality=480` to every screen. Ten screens tested on a simulated 15 Mbps line
+stayed 10/10 in step with no black frames, where 720p on a 100 Mbps line still
+dropped eight screens to black on a heavy clip.
+
+Don't rely on the automatic fallback for a wall — it adapts per screen, so some
+end up at 480p and some at 720p, which is visible when they're side by side.
+
 ### If a screen struggles
 
 The clips are served straight from the bucket, which sends no cache headers and
