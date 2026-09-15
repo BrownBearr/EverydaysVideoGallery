@@ -223,6 +223,33 @@
       gap: 0.5rem;
     }
 
+    /* Display modes sit above the styles: they change how every clip is shown,
+       where a style chip only changes which clips play. */
+    .picker-section + .picker-section {
+      margin-top: 1.1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .mode-note {
+      margin-top: 0.55rem;
+      color: rgba(255, 255, 255, 0.35);
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.68rem;
+      line-height: 1.45;
+    }
+
+    /* The shortcut, shown on the control that uses it. */
+    .chip kbd {
+      font: inherit;
+      font-size: 0.62rem;
+      opacity: 0.5;
+      border: 1px solid currentColor;
+      border-radius: 4px;
+      padding: 0 0.28rem;
+      line-height: 1.35;
+    }
+
     .chip {
       appearance: none;
       display: inline-flex;
@@ -331,11 +358,23 @@
     <button id="pickerToggle" type="button">filter</button>
     <div id="picker" class="hidden">
       <div class="picker-inner">
-        <div class="picker-head">
-          <span>styles</span>
-          <button id="allBtn" type="button">all</button>
+        <div class="picker-section">
+          <div class="picker-head">
+            <span>display</span>
+          </div>
+          <div class="chips">
+            <button id="fillBtn" class="chip" type="button">fill screen<kbd>Z</kbd></button>
+            <button id="syncBtn" class="chip" type="button">sync<kbd>S</kbd></button>
+          </div>
+          <div id="modeNote" class="mode-note"></div>
         </div>
-        <div id="chips" class="chips"></div>
+        <div class="picker-section">
+          <div class="picker-head">
+            <span>styles</span>
+            <button id="allBtn" type="button">all</button>
+          </div>
+          <div id="chips" class="chips"></div>
+        </div>
       </div>
     </div>
     <div id="gate" class="hidden">touch to begin</div>

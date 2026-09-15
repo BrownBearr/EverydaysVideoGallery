@@ -18,6 +18,11 @@ No server — a static Vite build, deployed to Cloudflare Pages.
 | `z` | fill mode on/off |
 | `s` | sync mode on/off |
 
+Both modes also have buttons under **display** at the top of the filter panel
+(`f`), which is the place to find them if you don't know the shortcut — the
+panel names the shortcut on each button and says what the mode is doing to this
+particular screen.
+
 Both modes are also settable in the URL — `?fill=1&sync=1` — which is what a
 kiosk bookmark should carry, and whichever way you set one it's remembered
 locally, so a screen that reboots mid-show comes back as it was. An explicit

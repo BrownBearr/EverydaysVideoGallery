@@ -619,6 +619,7 @@ function onResize(): void {
       setFit(l, contain);
       if (contain && layers.indexOf(l) === active) void l.ambient.play().catch(() => {});
     }
+    if (!pickerEl.classList.contains('hidden')) renderModes();
   }, 200);
 }
 
@@ -716,6 +717,29 @@ const pickerEl = document.getElementById('picker') as HTMLDivElement;
 const chipsEl = document.getElementById('chips') as HTMLDivElement;
 const allBtn = document.getElementById('allBtn') as HTMLButtonElement;
 const pickerToggle = document.getElementById('pickerToggle') as HTMLButtonElement;
+const fillBtn = document.getElementById('fillBtn') as HTMLButtonElement;
+const syncBtn = document.getElementById('syncBtn') as HTMLButtonElement;
+const modeNote = document.getElementById('modeNote') as HTMLDivElement;
+
+fillBtn.addEventListener('click', () => setFillMode(!fillMode));
+syncBtn.addEventListener('click', () => setSyncMode(!syncMode));
+
+// Say what each mode is currently doing, in terms of this screen. The cost of
+// fill depends entirely on the display's shape, so quote the real number rather
+// than a generic warning.
+function renderModes(): void {
+  fillBtn.classList.toggle('on', fillMode);
+  syncBtn.classList.toggle('on', syncMode);
+
+  const framed = clips.filter((c) => !fitsScreen(c)).length;
+  const share = Math.round((framed / clips.length) * 100);
+  modeNote.textContent = fillMode
+    ? `Every clip is scaled up to cover the screen and cropped — never stretched. ${share}% of the library is cropped at this shape.`
+    : `Clips that don't match the screen are shown whole, with a blurred fill. ${share}% of the library is framed that way right now.`;
+  if (syncMode) {
+    modeNote.textContent += ' Sync: every screen on this filter plays the same clip at the same moment.';
+  }
+}
 
 for (const s of stylesList) {
   const chip = document.createElement('button');
@@ -745,6 +769,8 @@ allBtn.addEventListener('click', () => {
 
 function setPicker(open: boolean): void {
   pickerEl.classList.toggle('hidden', !open);
+  // The framed-share depends on the viewport, so recompute it on open.
+  if (open) renderModes();
 }
 
 pickerToggle.addEventListener('click', () => setPicker(pickerEl.classList.contains('hidden')));
@@ -765,6 +791,7 @@ function setFillMode(on: boolean): void {
   fillMode = on;
   storeFlag('everdays:fill', on);
   syncUrl();
+  renderModes();
   for (const l of layers) {
     if (!l.clip) continue;
     const contain = wantsContain(l.clip);
@@ -779,6 +806,7 @@ function setSyncMode(on: boolean): void {
   syncMode = on;
   storeFlag('everdays:sync', on);
   syncUrl();
+  renderModes();
   startSyncHold();
   if (on) {
     void checkClock().then(() => {
@@ -876,6 +904,7 @@ gateEl.addEventListener('click', () => {
 
 stylesFromUrl();
 renderChips();
+renderModes();
 poke();
 void keepAwake();
 syncUrl();
