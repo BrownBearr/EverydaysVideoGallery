@@ -23,7 +23,9 @@ Once the download is done, the show does not need the internet at all.
 
 Do NOT do this at the gallery. It is an 8.6 GB download.
 
-  1. Open Terminal.
+  1. Open Terminal - the real macOS Terminal app, NOT the terminal inside
+     Claude Code. Commands there get cut off after 2 minutes and this
+     download takes much longer than that.
 
   2. Run these, one at a time:
 
