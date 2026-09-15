@@ -15,6 +15,13 @@ No server — a static Vite build, deployed to Cloudflare Pages.
 | `Enter` | toggle fullscreen |
 | `f` | open/close the style picker |
 | `Esc` | close the picker |
+| `z` | fill mode on/off |
+| `s` | sync mode on/off |
+
+Both modes are also settable in the URL — `?fill=1&sync=1` — which is what a
+kiosk bookmark should carry, and whichever way you set one it's remembered
+locally, so a screen that reboots mid-show comes back as it was. An explicit
+parameter always beats the remembered value (`?fill=0` forces it off).
 
 Everything on screen — caption, filter button, mouse cursor — fades out after
 4s of no input and returns on any movement or keypress. The picker never hides
@@ -42,17 +49,56 @@ so the frame shape alternates instead of arriving in long runs of one shape.
 To put an awkward shape on screen on demand when checking a display:
 `?only=1095` (comma-separated clip names).
 
+### Fill mode (`z`, `?fill=1`)
+
+Scales every clip up until it covers the screen and crops the overflow — one
+uniform scale, so nothing is ever distorted. No bars, no ambient fill, no
+vignette. What it costs depends on how far the clip is from the display: an
+ultrawide clip loses about 16% of its width, a 4:3 clip 25%, and a 406×720
+portrait clip keeps only 32% of its frame. Off by default.
+
+## Sync mode (`s`, `?sync=1`)
+
+Every instance of the site plays the same clip at the same moment, so a
+projector and a monitor across the room stay together.
+
+There's no server involved. Each instance *derives* the schedule: a fixed
+anchor date, a seeded shuffle, and the durations in `src/clips.json` are enough
+for any number of screens to compute the same running order and the same
+playhead independently. A screen opened mid-show joins mid-clip, already in
+step, and the position is re-checked every 15s — a small drift is corrected with
+a seek, a large one with an ordinary crossfade, never a hard cut. Measured
+agreement between two instances is well under a second.
+
+Two things follow from that design:
+
+- **The style filter is part of the schedule.** Two screens with the same filter
+  are in step; different filters run different schedules. The picker keeps
+  working while synced.
+- **Fill mode and screen shape don't affect it.** The order is derived against a
+  fixed 16:9 reference, so a portrait monitor in fill mode still shows the same
+  clip at the same moment as a 16:9 projector.
+
+The local clock is trusted by default — a gallery machine is NTP-synced far
+tighter than an HTTP `Date` header can measure. Server time is consulted only to
+catch a clock that is wrong by more than two seconds.
+
 ## Clip dimensions
 
-`src/clips.json` needs `w`/`h` on every entry. After adding clips, run:
+`src/clips.json` needs `w`/`h` and duration `d` on every entry. After adding
+clips, run:
 
 ```
 npm run clips:dims
 ```
 
-It ffprobes anything missing dimensions straight off the CDN (the bucket is
-public-read, so no credentials needed) and writes them back. `--force` re-probes
-everything.
+It ffprobes anything missing dimensions or duration straight off the CDN (the
+bucket is public-read, so no credentials needed) and writes them back. `--force`
+re-probes everything.
+
+Duration matters as much as size: the crossfade has to start before a clip ends,
+and sync mode builds its schedule from the whole library's running order without
+loading a file.
 
 ## Develop
 

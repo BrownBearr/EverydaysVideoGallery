@@ -78,3 +78,66 @@ makes the frame pulse for minutes at a time. `rebuildFeed()` shuffles the
 full-bleed and letterboxed sets separately and `interleave()`s them, capping
 runs at 2, then `breakStyleRuns()` does one bounded forward pass to split
 same-style neighbours.
+
+## Fill mode is a rendering choice, never an ordering one
+
+`wantsContain()` is the single gate: `!fillMode && !fitsScreen(clip)`. Fill mode
+makes every clip claim to fit, which drops `.fit-contain` and with it the
+letterbox, the ambient decode and the vignette in one move — no separate CSS
+path. Scaling is `object-fit: cover`, so it is always uniform; there is no
+transform involved and nothing is ever stretched.
+
+Toggling re-fits both layers in place and deliberately does **not** rebuild the
+feed — same reasoning as the resize path, and doubly important because the sync
+schedule must not move when a screen changes how it renders.
+
+## The crossfade must overlap two *playing* videos
+
+The original swap fired on `ended` and paused the outgoing layer immediately, so
+every transition dissolved from a frozen last frame. Two things fix it, and both
+are load-bearing:
+
+- The swap starts `fadeFor(d) + SWAP_LEAD_S` before the end, driven by
+  `timeupdate` off the media clock (so a buffering clip doesn't fade early).
+- The outgoing layer is paused only in the deferred timeout, once invisible.
+
+`SWAP_LEAD_S` is not padding. `timeupdate` fires only ~4×/sec, so without a lead
+the swap can start late enough that the outgoing clip ends *during* the fade and
+freezes for the tail — the exact defect being fixed. A soak over the library's
+shortest clips (4.6–8.0s) is the test that catches this; it found 5 frozen
+frames in 8 transitions before the lead existed, and 0 after.
+
+Regression test worth keeping: sample both layers ~50ms apart through a
+transition and assert both `currentTime`s advance monotonically while both are
+visible, and that neither is `paused`.
+
+## Sync derives, it never communicates
+
+There is no server, and adding one would be a much bigger change than it looks.
+Every instance computes the same answer from `SYNC_ANCHOR`, a seeded
+`mulberry32` shuffle, and the manifest durations. Consequences to respect:
+
+- **`slotLength()` and the playback trigger must stay in agreement.** Both use
+  `fadeFor(d) + SWAP_LEAD_S`. Change one without the other and every instance
+  slowly walks away from its own schedule.
+- **The order must not depend on the display.** `orderPool()` takes an explicit
+  reference ratio and sync passes `SYNC_REFERENCE_AR` (16:9), because
+  `fitsScreen()` otherwise reads `window.innerWidth/Height` and two differently
+  shaped screens would derive different feeds.
+- **The filter is part of the seed** (`syncKey()`), which is what lets the picker
+  keep working while synced.
+- **Never change `SYNC_ANCHOR`.** It would resequence every running instance at
+  once.
+- **Trust the local clock.** An HTTP `Date` header is quantised to the second,
+  and a gallery machine's NTP clock is better than that; `checkClock()` corrects
+  only past `CLOCK_SKEW_TOLERANCE_MS` (2s), to catch a badly-set machine.
+
+## Swapping to a layer that isn't ready
+
+`advance()` waits for `canplay` when the incoming layer isn't buffered yet.
+Ordinary swaps target a layer preloaded a whole clip earlier and are immediate,
+but a resync and a filter change both aim a layer at a new file and switch to it
+at once — and `play()` on an element still working through `load()` or a seek
+gets aborted, leaving a silent black layer. The `started` flag exists for the
+same class of bug: it stops a late startup `canplay` from undoing a resync that
+already put something on screen.

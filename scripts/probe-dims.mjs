@@ -1,10 +1,14 @@
-// Bake each clip's pixel dimensions into src/clips.json.
+// Bake each clip's pixel dimensions and duration into src/clips.json.
 //
 // The renderer decides how to fit a clip (fill the screen, or show it whole with
 // an ambient side-fill) from its aspect ratio. Reading that from the <video>
 // element means waiting for loadedmetadata, which is too late to pick a source
 // for the ambient layer or to sequence the feed by shape — so we probe once,
 // offline, and ship the numbers in the manifest.
+//
+// Duration is needed just as early: the crossfade has to start before a clip
+// ends, and sync mode builds a schedule out of the whole library's running
+// order without loading a single file.
 //
 // Reads VITE_CDN_BASE from .env / .env.local. The bucket is public-read, so no
 // B2 credentials are needed here.
@@ -57,16 +61,21 @@ if (!CDN) {
 const CONCURRENCY = 16;
 
 async function probe(name) {
+  // One request for both: csv prints the stream row (WxH) then the format row
+  // (duration), newline-separated.
   const { stdout } = await execFileAsync(FFPROBE, [
     "-v", "error",
     "-select_streams", "v:0",
-    "-show_entries", "stream=width,height",
+    "-show_entries", "stream=width,height:format=duration",
     "-of", "csv=p=0:s=x",
     `${CDN}/${name}.mp4`,
   ]);
-  const [w, h] = stdout.trim().split("x").map(Number);
+  const [dims = "", dur = ""] = stdout.trim().split("\n");
+  const [w, h] = dims.trim().split("x").map(Number);
+  const d = Number.parseFloat(dur);
   if (!w || !h) throw new Error(`no video stream (got "${stdout.trim()}")`);
-  return { w, h };
+  if (!Number.isFinite(d) || d <= 0) throw new Error(`no duration (got "${dur.trim()}")`);
+  return { w, h, d: Math.round(d * 1000) / 1000 };
 }
 
 // Run `worker` over `items` with a fixed number of concurrent slots.
@@ -80,7 +89,7 @@ async function pool(items, worker) {
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, "utf8"));
 const todo = manifest.clips
-  .filter((c) => FORCE || !c.w || !c.h)
+  .filter((c) => FORCE || !c.w || !c.h || !c.d)
   .slice(0, LIMIT === Infinity ? undefined : LIMIT);
 
 if (!todo.length) {
@@ -95,9 +104,10 @@ const failed = [];
 
 await pool(todo, async (clip) => {
   try {
-    const { w, h } = await probe(clip.name);
+    const { w, h, d } = await probe(clip.name);
     clip.w = w;
     clip.h = h;
+    clip.d = d;
   } catch (err) {
     failed.push(`${clip.name}: ${err.message.split("\n")[0]}`);
   }
@@ -108,11 +118,15 @@ await pool(todo, async (clip) => {
 process.stdout.write("\n");
 
 // Keep the field order stable so the diff stays readable.
-manifest.clips = manifest.clips.map(({ id, name, w, h }) => ({ id, name, w, h }));
+manifest.clips = manifest.clips.map(({ id, name, w, h, d }) => ({ id, name, w, h, d }));
 fs.writeFileSync(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
 
-const sized = manifest.clips.filter((c) => c.w && c.h).length;
-console.log(`✓ Wrote src/clips.json — ${sized}/${manifest.clips.length} clips sized.`);
+const sized = manifest.clips.filter((c) => c.w && c.h && c.d).length;
+const runtime = manifest.clips.reduce((s, c) => s + (c.d || 0), 0);
+console.log(
+  `✓ Wrote src/clips.json — ${sized}/${manifest.clips.length} clips sized, ` +
+    `${(runtime / 3600).toFixed(2)}h total runtime.`,
+);
 if (failed.length) {
   console.error(`\n${failed.length} failed:`);
   for (const f of failed) console.error(`  ${f}`);
