@@ -141,3 +141,64 @@ at once — and `play()` on an element still working through `load()` or a seek
 gets aborted, leaving a silent black layer. The `started` flag exists for the
 same class of bug: it stops a late startup `canplay` from undoing a resync that
 already put something on screen.
+
+## Correcting sync drift: trim the rate, don't seek
+
+The clips come from the bucket with no `Cache-Control` and no edge cache, so a
+seek is a fresh range request across the network and reads as a hitch. Checking
+rarely (15s) and then seeking was the worst of both worlds: it produced a
+correction on most checks — 7 seeks and 7 stalls in a 3-minute run.
+
+Now the check runs every 2s and corrects by trimming `playbackRate` within ±10%.
+The video is muted, so a few percent is invisible where a seek is not. A seek is
+reserved for drift past `DRIFT_RESEEK_S`, where easing would take too long.
+Same 3-minute run afterwards: 1 seek (the join, which must seek) and 0 stalls.
+
+**Why it drifted that fast:** the crossfade used to be triggered from
+`timeupdate`, which fires ~4x/sec, so every clip started up to 250ms late and
+the error accumulated across swaps. `armSwap()` now computes the moment and uses
+a timer; `timeupdate` remains only as a backstop. Fixing the trigger removed the
+cause; rate trimming absorbs what's left.
+
+`armSwap()` keys off `clip.d` from the manifest, never `video.duration` — the
+480p copies run up to 0.085s longer than their sources, and a screen that had
+dropped quality would otherwise swap at a different moment from one that hadn't.
+
+## Adaptive source quality
+
+Every clip exists twice: the 720p source and a 480p copy 5–20x smaller (the
+ambient fill already used the small one). The largest clip is 21.7MB, which
+needs ~43s at 4 Mbps to replace a clip 20s long — it can never win, and the
+result is a black wall. So a screen that can't keep up switches to the small
+files and climbs back after six clean clips.
+
+The decision is made from measured behaviour — a readiness timeout or a stall —
+never from `navigator.connection.downlink`. That field looks like exactly the
+right signal and is not: it is a rolling average of recent traffic, measured
+here at **1.7 on an unthrottled link and 3.7 on one throttled to 4 Mbps**.
+Only `saveData` (an explicit user preference) and `?quality=` are trusted up
+front.
+
+Throttled to 4 Mbps/300ms, this took black frames from **44.7% to 0.2%**.
+
+## Prefetching must never compete with playback
+
+An unconditional prefetch of the next-but-one clip made things dramatically
+worse on a slow link: it took bandwidth from the clip on screen and starved it,
+and a 21.7MB file that kept being aborted and restarted was re-requested four
+times in 35 seconds. `prefetchWhenIdle()` now waits for the on-deck layer to
+reach `HAVE_ENOUGH_DATA` before starting, and a prefetch is recorded before it
+is issued so a failure can't retry in a loop.
+
+## Never let both layers be inactive
+
+`activate()` used to `add('active')` on the incoming layer and then
+`remove('active')` from the outgoing one. When those are the same element — two
+overlapping swaps, where the second activation lands after `active` has already
+moved — that adds the class and immediately strips it, leaving **neither** layer
+visible: a black screen with both clips happily playing behind it. The partner
+is now cleared first and only when it is a different node, and `swapPending`
+stops a second swap being queued while one is waiting on readiness.
+
+Worth keeping as a test: poll `document.querySelector('.layer.active')` while
+hammering sync and filter toggles; it must never be null.

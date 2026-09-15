@@ -84,6 +84,18 @@ Two things follow from that design:
   fixed 16:9 reference, so a portrait monitor in fill mode still shows the same
   clip at the same moment as a 16:9 projector.
 
+### If a screen struggles
+
+The clips are served straight from the bucket, which sends no cache headers and
+sits behind no CDN, so the first read of a file is a full round trip. Every clip
+also exists as a 480p copy (5–20× smaller), and a screen that can't keep the
+720p sources arriving in time falls back to those on its own rather than showing
+black. It climbs back up after a sustained clean run.
+
+Pin it with `?quality=720` or `?quality=480` for a machine you already know
+about. A screen on 480p stays in sync with one on 720p — the schedule is built
+from the manifest, not from whichever file a given screen happens to be playing.
+
 The local clock is trusted by default — a gallery machine is NTP-synced far
 tighter than an HTTP `Date` header can measure. Server time is consulted only to
 catch a clock that is wrong by more than two seconds.

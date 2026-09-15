@@ -222,6 +222,11 @@ function nextClip(): Clip {
   return clip;
 }
 
+// What's coming, without taking it off the queue.
+function peekClip(ahead = 0): Clip | undefined {
+  return feed.length ? feed[(feedIndex + ahead) % feed.length] : undefined;
+}
+
 // ── Sync ────────────────────────────────────────────────────────────────────
 // There is no server, so instances don't get told what to play — they each
 // derive it. Given a shared anchor, a seeded shuffle and the durations in the
@@ -242,9 +247,19 @@ const SYNC_REFERENCE_AR = 16 / 9;
 // Date header can measure), above it we apply the correction.
 const CLOCK_SKEW_TOLERANCE_MS = 2000;
 
-// How far the playhead may wander before we pull it back, and how often to look.
-const DRIFT_TOLERANCE_S = 0.35;
-const DRIFT_CHECK_MS = 15000;
+// Drift correction. The clips come straight off B2 with no cache headers and no
+// edge in front, so a seek is a fresh range request over the network and shows
+// up as a visible hitch — checking rarely and then seeking is the worst of both
+// worlds. Instead look often and correct by trimming the playback rate: the
+// video is muted, so a few percent either way is invisible, where a seek is not.
+const DRIFT_CHECK_MS = 2000;
+const DRIFT_DEADBAND_S = 0.05; // close enough; leave it alone
+const DRIFT_EASE_S = 3; // converge over roughly this long
+const MAX_RATE_TRIM = 0.1; // never more than 10% off normal speed
+const DRIFT_RESEEK_S = 2; // beyond this, easing would take too long — seek once
+
+// How long to wait for a layer to become playable before giving up on its clip.
+const READY_TIMEOUT_MS = 6000;
 
 let clockOffsetMs = 0;
 
@@ -409,13 +424,72 @@ function slotLength(clip: Clip): number {
 let active = 1;
 let pendingPreload = 0; // timeout id for the deferred partner preload
 let readyTimer = 0; // fallback timeout for a swap waiting on canplay
+let swapTimer = 0; // precise, schedule-accurate trigger for the next crossfade
+let fading = false; // true for the length of a crossfade
+let swapPending = false; // a swap is waiting for its layer to become playable
 let swapping = false; // guards the pre-emptive crossfade against double-firing
 let started = false; // true once anything has been put on screen
 
-const HAVE_CURRENT_DATA = 2;
+const HAVE_FUTURE_DATA = 3;
+const HAVE_ENOUGH_DATA = 4;
+
+// ── Source quality ──────────────────────────────────────────────────────────
+// Every clip exists twice in the bucket: the 720p source, and the 480p copy the
+// ambient fill uses — 5 to 20x smaller. On a constrained connection the big
+// files simply cannot arrive in time (the largest is 21.7MB, which needs ~43s
+// at 4 Mbps, to replace a clip that is 20s long), and the result is a black
+// wall. So the quality follows what the connection can actually sustain.
+//
+// ?quality=480 or ?quality=720 pins it for a machine you already know about.
+let smallSource = false;
+
+const qualityParam = params.get('quality');
+if (qualityParam === '480' || qualityParam === 'small') smallSource = true;
+else if (qualityParam !== '720' && qualityParam !== 'source') {
+  // Only an explicit user preference is trusted up front. `connection.downlink`
+  // looks like the right signal and isn't: it's a rolling average of recent
+  // traffic, so on a fresh page it reports whatever happened to be going on —
+  // measured here at 1.7 on an unthrottled link and 3.7 on one throttled to
+  // 4 Mbps, i.e. backwards. Everything else is learned from how the real files
+  // actually behave, below.
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  if (conn?.saveData) smallSource = true;
+}
+
+const qualityPinned = qualityParam !== null;
+
+// Trouble is counted, not reacted to one event at a time: a single stall on an
+// otherwise healthy link shouldn't drop the whole show to 480p.
+let troubleCount = 0;
+let cleanClips = 0;
+
+function noteTrouble(): void {
+  if (qualityPinned || smallSource) return;
+  // Before anything has been shown there's nothing to protect and no reason to
+  // wait for a second opinion — a blank screen at gallery open is the worst
+  // case there is.
+  if (++troubleCount < 2 && started) return;
+  smallSource = true;
+  troubleCount = 0;
+  cleanClips = 0;
+  // Re-point whatever is on deck at the smaller file; the active clip is
+  // already playing and is left alone.
+  const partner = layers[1 - active];
+  if (partner.clip) preload(partner, partner.clip);
+}
+
+function noteCleanClip(): void {
+  if (qualityPinned || !smallSource) return;
+  // Only climb back after a sustained clean run — flapping between sources is
+  // worse than staying small.
+  if (++cleanClips < 6) return;
+  smallSource = false;
+  cleanClips = 0;
+  troubleCount = 0;
+}
 
 function videoUrl(name: string): string {
-  return `${CDN}/${name}.mp4`;
+  return smallSource ? `${CDN}/${name}-480.mp4` : `${CDN}/${name}.mp4`;
 }
 
 // The fill is blurred past recognition, so it runs off the 480p preview the
@@ -423,6 +497,47 @@ function videoUrl(name: string): string {
 // streams on the machine during a crossfade for no visible gain.
 function ambientUrl(name: string): string {
   return `${CDN}/${name}-480.mp4`;
+}
+
+// The clips are served straight from the bucket — no cache headers, no edge in
+// front — so the first read of a file is a full round trip to us-east and a
+// swap can arrive before the data does. While the current clip plays there is
+// nothing else competing for bandwidth, so pull the one after next into the
+// HTTP cache: by the time a layer is pointed at it, it starts from disk.
+//
+// Nothing keeps the bytes; the point is only to leave them in the browser cache.
+const prefetched = new Set<string>();
+let prefetchAbort: AbortController | null = null;
+
+// Only ever runs with capacity to spare: the caller waits until the on-deck
+// layer is fully buffered, so this can't take bandwidth from a clip that is
+// about to be needed. An unconditional prefetch is actively harmful on a slow
+// link — it competed with the clip on screen and starved it.
+function prefetch(clip: Clip | undefined): void {
+  if (!clip) return;
+  const url = videoUrl(clip.name);
+  if (prefetched.has(url)) return;
+  prefetchAbort?.abort();
+  const ctrl = new AbortController();
+  prefetchAbort = ctrl;
+  // Recorded before the request so a failure never retries in a loop; the layer
+  // that needs it will load it normally anyway.
+  prefetched.add(url);
+  if (prefetched.size > 40) prefetched.delete(prefetched.values().next().value as string);
+  void fetch(url, { signal: ctrl.signal })
+    .then((r) => r.arrayBuffer())
+    .then(() => undefined)
+    .catch(() => undefined);
+}
+
+// Wait for the on-deck layer to hold a whole clip before warming the next one.
+function prefetchWhenIdle(partner: Layer): void {
+  const start = (): void => {
+    partner.main.removeEventListener('canplaythrough', start);
+    prefetch(peekClip());
+  };
+  if (partner.main.readyState >= HAVE_ENOUGH_DATA) start();
+  else partner.main.addEventListener('canplaythrough', start);
 }
 
 // Attach or detach the blurred side-fill to match the layer's current fit.
@@ -445,6 +560,9 @@ function setFit(l: Layer, contain: boolean): void {
 // manifest, so the fit is settled here rather than waiting on loadedmetadata.
 function preload(l: Layer, clip: Clip, startAt = 0): void {
   l.clip = clip;
+  // Drop any drift trim: it belonged to the clip being replaced.
+  l.main.playbackRate = 1;
+  l.ambient.playbackRate = 1;
   l.main.dataset.name = clip.name;
   l.main.src = videoUrl(clip.name);
   l.main.load();
@@ -480,8 +598,10 @@ function armWatchdog(): void {
   stallTimer = window.setInterval(() => {
     const v = layers[active].main;
     if (v.paused || v.ended) return;
-    if (lastTime >= 0 && v.currentTime === lastTime) advance();
-    else lastTime = v.currentTime;
+    if (lastTime >= 0 && v.currentTime === lastTime) {
+      noteTrouble();
+      advance();
+    } else lastTime = v.currentTime;
   }, STALL_MS);
 }
 
@@ -520,12 +640,25 @@ function activate(l: Layer): void {
   active = layers.indexOf(l);
   swapping = false;
   started = true;
+  swapPending = false;
 
+  // Clear the partner first, and only when it's a different element. Adding the
+  // class and then removing it from the same node — which happens the moment a
+  // layer is activated twice — left *neither* layer visible, i.e. a black wall
+  // with both clips still playing behind it.
+  if (partner !== l) partner.root.classList.remove('active');
   l.root.classList.add('active');
-  partner.root.classList.remove('active');
 
   tryPlay(l);
   armWatchdog();
+  armSwap(l);
+
+  // Hold off drift correction until the picture has settled; mid-fade the
+  // "current" clip is ambiguous and a correction there is what a viewer sees.
+  fading = true;
+  window.setTimeout(() => {
+    fading = false;
+  }, FADE_MS);
 
   // Dip the caption out, swap the number while it's invisible, bring it back —
   // so it dissolves along with the clip it names instead of snapping.
@@ -540,12 +673,48 @@ function activate(l: Layer): void {
   // into a dissolve from a frozen frame. Once it's invisible, stop it and point
   // it at the next clip; there's a full clip's length left to buffer, so the
   // next swap stays hitch-free.
+  // Getting this far means the previous clip ran to its crossfade and the next
+  // one was ready in time — the evidence needed to try the bigger source again.
+  noteCleanClip();
+
   const upcoming = nextClip();
   pendingPreload = window.setTimeout(() => {
     partner.main.pause();
     partner.ambient.pause();
     preload(partner, upcoming);
+    // Warm the clip after that, but only once the partner has what it needs.
+    prefetchWhenIdle(partner);
   }, FADE_MS + 150);
+}
+
+// Fire the crossfade at a computed moment rather than waiting for a timeupdate
+// to notice. `timeupdate` only lands about 4x a second, so triggering off it
+// started every clip up to 250ms late — small once, but it accumulates across
+// swaps and was the reason a synced screen needed correcting every 15 seconds.
+// Always the manifest's duration, never the loaded file's. The 480p copies run
+// up to 0.085s longer than their 720p sources (frame-rate rounding), so keying
+// off the element would make a screen that had dropped quality swap at a
+// slightly different moment from one that hadn't — and the schedule is built
+// from the manifest regardless. The lead is far wider than the discrepancy.
+function clipDuration(l: Layer): number {
+  const d = l.clip?.d ?? l.main.duration;
+  return Number.isFinite(d) && d > 0 ? d : 0;
+}
+
+function armSwap(l: Layer): void {
+  window.clearTimeout(swapTimer);
+  const d = clipDuration(l);
+  if (!d) return;
+  const rate = l.main.playbackRate || 1;
+  const remain = (d - fadeFor(d) - SWAP_LEAD_S - l.main.currentTime) / rate;
+  swapTimer = window.setTimeout(
+    () => {
+      if (swapping || layers[active] !== l || l.main.paused) return;
+      swapping = true;
+      advance();
+    },
+    Math.max(0, remain * 1000),
+  );
 }
 
 // Swap to whichever layer is holding the preloaded next clip.
@@ -557,33 +726,81 @@ function activate(l: Layer): void {
 // the play aborted, leaving a silent black layer. So wait for readiness when
 // it isn't there yet.
 function advance(): void {
+  // A swap already waiting on its layer to become playable. Starting another
+  // would queue a second activation of the same layer, and the second one lands
+  // after `active` has already moved — see the note in activate().
+  if (swapPending) return;
   window.clearInterval(stallTimer);
+  window.clearTimeout(swapTimer);
   const next = layers[1 - active];
   // Nothing queued at all (a swap this early can only come from a resync).
   if (!next.clip) preload(next, nextClip());
+  swapPending = true;
+  whenPlayable(next, () => activate(next));
+}
 
-  if (next.main.readyState >= HAVE_CURRENT_DATA) {
-    activate(next);
+// Run `go` once the layer can actually paint, and not before. Swapping to a
+// layer that is still loading or still seeking is what puts black on screen —
+// and against an origin with no cache headers, "still loading" is normal on a
+// cold or distant connection. Because the crossfade starts early, the outgoing
+// clip is still playing while we wait, so waiting costs a late transition
+// rather than a gap.
+function whenPlayable(l: Layer, go: () => void): void {
+  window.clearTimeout(readyTimer);
+  let done = false;
+
+  const ready = (): boolean => l.main.readyState >= HAVE_FUTURE_DATA && !l.main.seeking;
+  const cleanup = (): void => {
+    l.main.removeEventListener('canplay', check);
+    l.main.removeEventListener('canplaythrough', check);
+    l.main.removeEventListener('seeked', check);
+    window.clearTimeout(readyTimer);
+  };
+  function check(): void {
+    if (done || !ready()) return;
+    done = true;
+    cleanup();
+    go();
+  }
+
+  if (ready()) {
+    go();
     return;
   }
-  const go = (): void => {
-    next.main.removeEventListener('canplay', go);
-    window.clearTimeout(readyTimer);
-    activate(next);
-  };
-  next.main.addEventListener('canplay', go);
-  // Don't hang forever if canplay never comes; the error/stall paths take over.
-  readyTimer = window.setTimeout(go, 3000);
+  l.main.addEventListener('canplay', check);
+  l.main.addEventListener('canplaythrough', check);
+  l.main.addEventListener('seeked', check);
+
+  readyTimer = window.setTimeout(() => {
+    if (done) return;
+    done = true;
+    cleanup();
+    // Not ready in time is the clearest signal the source is too heavy here.
+    noteTrouble();
+    // This clip won't load. Rather than show nothing, leave the current one up
+    // and try a different clip — in sync mode, whichever one is due by now.
+    if (syncMode) resyncNow();
+    else {
+      preload(l, nextClip());
+      whenPlayable(l, () => activate(l));
+    }
+  }, READY_TIMEOUT_MS);
 }
 
 for (const l of layers) {
-  // Begin the crossfade before the clip runs out, so both are still playing
-  // while they overlap. Driven by the media clock rather than a timer, so a
-  // clip that buffers mid-way doesn't fade early.
+  // The precise timer needs the duration, and a seek moves the target.
+  for (const evt of ['loadedmetadata', 'seeked', 'playing']) {
+    l.main.addEventListener(evt, () => {
+      if (layers[active] === l && !l.main.paused) armSwap(l);
+    });
+  }
+  // Backstop for the timer above: if it's ever missed — a tab throttled in the
+  // background, a rate change we didn't re-arm for — the media clock still
+  // starts the fade. Driven off playback, so a buffering clip won't fade early.
   l.main.addEventListener('timeupdate', () => {
     if (swapping || layers.indexOf(l) !== active) return;
-    const d = l.main.duration;
-    if (!Number.isFinite(d) || d <= 0) return;
+    const d = clipDuration(l);
+    if (!d) return;
     if (d - l.main.currentTime <= fadeFor(d) + SWAP_LEAD_S) {
       swapping = true;
       advance();
@@ -632,28 +849,56 @@ window.addEventListener('orientationchange', onResize);
 
 let driftTimer = 0;
 
+// Trim playback speed. Muted video, so this is imperceptible — and unlike a
+// seek it costs nothing, where a seek here means a fresh range request to B2.
+function setRate(l: Layer, rate: number): void {
+  if (Math.abs(l.main.playbackRate - rate) < 0.001) return;
+  l.main.playbackRate = rate;
+  l.ambient.playbackRate = rate;
+  // The swap is scheduled in wall-clock time, so a speed change moves it.
+  if (layers[active] === l) armSwap(l);
+}
+
 function holdSync(): void {
-  if (!syncMode) return;
+  if (!syncMode || fading) return;
   const l = layers[active];
-  if (!l.clip || l.main.paused || swapping) return;
+  if (!l.clip || l.main.paused || l.main.seeking) return;
 
   const due = syncPosition();
   if (due.clip.name !== l.clip.name) {
-    // On the wrong clip entirely — crossfade to the right one rather than cut.
+    // Mid-transition the schedule legitimately names the clip we're already
+    // swapping to. Reseating the feed here was causing spurious hard jumps.
+    const queued = layers[1 - active].clip;
+    if (queued && due.clip.name === queued.name) return;
     resyncNow();
     return;
   }
-  if (Math.abs(l.main.currentTime - due.offset) > DRIFT_TOLERANCE_S) {
+
+  const drift = l.main.currentTime - due.offset; // positive = running ahead
+  if (Math.abs(drift) >= DRIFT_RESEEK_S) {
+    setRate(l, 1);
     seekTo(l, due.offset);
+    return;
   }
+  if (Math.abs(drift) <= DRIFT_DEADBAND_S) {
+    setRate(l, 1);
+    return;
+  }
+  const trim = Math.max(-MAX_RATE_TRIM, Math.min(MAX_RATE_TRIM, -drift / DRIFT_EASE_S));
+  setRate(l, 1 + trim);
 }
 
-// Jump the wall to wherever the schedule says it should be, via a normal
-// crossfade so the correction doesn't read as a glitch.
+// Put the wall where the schedule says it should be. The new clip is loaded and
+// seeked while it's still hidden, and only swapped in once it can actually
+// paint — the old one keeps playing meanwhile, so a slow load costs a late
+// transition rather than a black screen.
 function resyncNow(): void {
   window.clearTimeout(pendingPreload);
+  window.clearTimeout(readyTimer);
+  swapPending = false; // this supersedes any swap still waiting
   const { clip, offset } = syncFeed();
   const partner = layers[1 - active];
+  setRate(partner, 1);
   preload(partner, clip, offset);
   advance();
 }
@@ -931,10 +1176,8 @@ if (syncMode && !onlyFilter().size) {
 
 // Whichever path armed layer A, it goes on screen as soon as it can play — and
 // only once, so a resync that lands first isn't undone by a late canplay.
-layers[0].main.addEventListener(
-  'canplay',
-  () => {
-    if (!started) activate(layers[0]);
-  },
-  { once: true },
-);
+// Same readiness gate as every other swap, so the first clip also gets the
+// timeout, the quality fallback and the retry rather than a bare canplay.
+whenPlayable(layers[0], () => {
+  if (!started) activate(layers[0]);
+});
