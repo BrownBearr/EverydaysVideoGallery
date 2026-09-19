@@ -588,6 +588,11 @@ function setFit(l: Layer, contain: boolean): void {
 // Point a layer at a clip and begin buffering. The shape is known from the
 // manifest, so the fit is settled here rather than waiting on loadedmetadata.
 function preload(l: Layer, clip: Clip, startAt = 0): void {
+  // A layer that isn't the one on screen must be invisible before it takes a
+  // new source, or its first frame can flash through.
+  if (layers[active] !== l && Number(getComputedStyle(l.root).opacity) > 0.01) {
+    hideInstantly(l);
+  }
   l.clip = clip;
   // Drop any drift trim: it belonged to the clip being replaced.
   l.main.playbackRate = 1;
@@ -683,7 +688,7 @@ function activate(l: Layer): void {
     partner.root.classList.remove('active');
     partner.root.classList.add('holding');
     window.clearTimeout(holdTimer);
-    holdTimer = window.setTimeout(() => partner.root.classList.remove('holding'), FADE_MS);
+    holdTimer = window.setTimeout(() => hideInstantly(partner), FADE_MS);
   }
   l.root.classList.remove('holding');
   l.root.classList.add('active');
@@ -724,6 +729,19 @@ function activate(l: Layer): void {
     // Warm the clip after that, but only once the partner has what it needs.
     prefetchWhenIdle(partner);
   }, FADE_MS + 150);
+}
+
+// Drop a layer to fully transparent with no animation. Letting it fade would
+// leave it still nearly opaque when it gets pointed at the next clip 150ms
+// later — and a new clip's first frame landing on a layer that is still 97%
+// opaque is exactly how a white-opening clip shows up as a one-frame flash.
+// It is already covered by the incoming layer at this point, so there is
+// nothing to animate away.
+function hideInstantly(l: Layer): void {
+  l.root.style.transition = 'none';
+  l.root.classList.remove('holding');
+  void l.root.offsetWidth; // commit the change before the transition returns
+  l.root.style.transition = '';
 }
 
 // Fire the crossfade at a computed moment rather than waiting for a timeupdate
