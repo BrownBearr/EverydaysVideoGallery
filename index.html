@@ -4,10 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>everdays</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
+    /* Inter, served from the build rather than Google Fonts. A wall of screens
+       runs on a local server with the internet unplugged, and a stylesheet from
+       an unreachable host is a render-blocking request that a captive portal can
+       make worse than a plain failure. Self-hosted, the typography is the same
+       whether or not there's a connection. Variable font: one file, all weights.
+       Inter is SIL Open Font License. */
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url('/fonts/inter-var-latin.woff2') format('woff2');
+    }
+
     *, *::before, *::after {
       margin: 0;
       padding: 0;

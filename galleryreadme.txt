@@ -14,7 +14,21 @@ request the same file at the same instant. Ten screens at full quality is about
 wall on a normal gallery connection. Over the local network that same traffic
 is nothing.
 
-Once the download is done, the show does not need the internet at all.
+Once the download is done, the show does not need the internet at all. The
+laptop is not streaming anything during the show - it reads the video files
+off its own hard drive and hands them to the screens over the wifi. You could
+unplug the venue's internet entirely and nothing would change.
+
+      BEFORE (done already)            DURING THE SHOW
+      ---------------------            ---------------
+
+        Backblaze                        [ laptop ]
+            |                                 |      reads its own disk
+        8.98 GB                          gallery wifi
+            |                                 |
+        [ laptop ]            screen1  screen2 ... screen10
+
+                                    (no internet involved)
 
 
 ===============================================================================
