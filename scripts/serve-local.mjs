@@ -45,6 +45,7 @@ const value = (n, d) => {
 };
 
 const PORT = Number.parseInt(value("--port", "8080"), 10);
+const VERBOSE = flag("--verbose");
 const QUALITY = value("--quality", "720");
 const SMALL = QUALITY === "480" || QUALITY === "small";
 const CDN = (process.env.VITE_CDN_BASE || "").replace(/\/$/, "");
@@ -179,7 +180,17 @@ function serve() {
   const only480 = files.every((f) => f.endsWith("-480.mp4"));
   const haveClips = files.length;
 
+  // Log every request with who it came from. When a screen won't load, the
+  // first thing worth knowing is whether its request reaches this machine at
+  // all — that separates a network problem from everything else.
+  const seen = new Set();
   const server = http.createServer((req, res) => {
+    const from = (req.socket.remoteAddress || "?").replace(/^::ffff:/, "");
+    if (!seen.has(from)) {
+      seen.add(from);
+      console.log(`  [${new Date().toLocaleTimeString()}] first contact from ${from}`);
+    }
+    if (VERBOSE) console.log(`  ${from} ${req.method} ${(req.url || "").slice(0, 70)}`);
     if (req.method === "OPTIONS") {
       res.writeHead(204, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "range" });
       res.end();
@@ -218,9 +229,9 @@ function serve() {
     console.log("Open this on each screen:\n");
     const q = only480 ? "&quality=480" : "";
     for (const a of addrs) {
-      console.log(`    http://${a}:${PORT}/?sync=1${q}&cdn=http://${a}:${PORT}/clips`);
+      console.log(`    http://${a}:${PORT}/?sync=1${q}`);
     }
-    if (!addrs.length) console.log(`    http://localhost:${PORT}/?sync=1${q}&cdn=http://localhost:${PORT}/clips`);
+    if (!addrs.length) console.log(`    http://localhost:${PORT}/?sync=1${q}`);
     if (only480) console.log(`\n  (480p-only library, so quality is pinned — re-fetch without --quality 480 for full res.)`);
     console.log(`\n  Add &fill=1 for full-bleed. Every screen must use the same URL to stay in sync.`);
     console.log(`  Ctrl-C to stop.\n`);

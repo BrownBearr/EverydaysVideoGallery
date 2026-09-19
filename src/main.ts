@@ -9,7 +9,23 @@ type Clip = { id: number; name: string; w: number; h: number; d: number };
 function resolveCdn(): string {
   const override = new URLSearchParams(location.search).get('cdn');
   if (override && /^https?:\/\//i.test(override)) return override.replace(/\/$/, '');
+  // Served from a machine on the local network? Then the clips are alongside
+  // the page, under /clips. Detecting that keeps the URL a screen has to be
+  // given down to the address and ?sync=1 — a long one with the server's
+  // address repeated inside it is a typo waiting to happen, and a stale copy
+  // of it loads the page fine while no video ever arrives.
+  if (isPrivateHost(location.hostname)) return `${location.origin}/clips`;
   return (import.meta.env.VITE_CDN_BASE as string).replace(/\/$/, '');
+}
+
+function isPrivateHost(host: string): boolean {
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+  if (/\.local$/i.test(host)) return true;
+  const m = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(host);
+  if (!m) return false;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  return a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
 }
 
 const CDN = resolveCdn();
@@ -465,7 +481,10 @@ else if (qualityParam !== '720' && qualityParam !== 'source') {
   if (conn?.saveData) smallSource = true;
 }
 
-const qualityPinned = qualityParam !== null;
+// Pinned means "stop adapting on your own" — set from the URL, or the moment
+// someone chooses a quality by hand. On a wall you want every screen the same,
+// and per-screen adaptation is exactly what breaks that.
+let qualityPinned = qualityParam !== null;
 
 // Trouble is counted, not reacted to one event at a time: a single stall on an
 // otherwise healthy link shouldn't drop the whole show to 480p.
@@ -943,6 +962,8 @@ function syncUrl(): void {
   else next.delete('fill');
   if (syncMode) next.set('sync', '1');
   else next.delete('sync');
+  if (qualityPinned) next.set('quality', smallSource ? '480' : '720');
+  else next.delete('quality');
   const qs = next.toString();
   history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
 }
@@ -973,10 +994,12 @@ const allBtn = document.getElementById('allBtn') as HTMLButtonElement;
 const pickerToggle = document.getElementById('pickerToggle') as HTMLButtonElement;
 const fillBtn = document.getElementById('fillBtn') as HTMLButtonElement;
 const syncBtn = document.getElementById('syncBtn') as HTMLButtonElement;
+const qualityBtn = document.getElementById('qualityBtn') as HTMLButtonElement;
 const modeNote = document.getElementById('modeNote') as HTMLDivElement;
 
 fillBtn.addEventListener('click', () => setFillMode(!fillMode));
 syncBtn.addEventListener('click', () => setSyncMode(!syncMode));
+qualityBtn.addEventListener('click', () => setQuality(!smallSource));
 
 // Say what each mode is currently doing, in terms of this screen. The cost of
 // fill depends entirely on the display's shape, so quote the real number rather
@@ -984,6 +1007,8 @@ syncBtn.addEventListener('click', () => setSyncMode(!syncMode));
 function renderModes(): void {
   fillBtn.classList.toggle('on', fillMode);
   syncBtn.classList.toggle('on', syncMode);
+  qualityBtn.classList.toggle('on', !smallSource);
+  qualityBtn.innerHTML = `${smallSource ? '480p' : '720p'}<kbd>Q</kbd>`;
 
   const framed = clips.filter((c) => !fitsScreen(c)).length;
   const share = Math.round((framed / clips.length) * 100);
@@ -993,6 +1018,9 @@ function renderModes(): void {
   if (syncMode) {
     modeNote.textContent += ' Sync: every screen on this filter plays the same clip at the same moment.';
   }
+  modeNote.textContent += qualityPinned
+    ? ` Quality is pinned to ${smallSource ? '480p' : '720p'} on this screen.`
+    : ' Quality is automatic — on a wall, pin every screen to the same one.';
 }
 
 for (const s of stylesList) {
@@ -1034,6 +1062,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Enter') void toggleFullscreen();
   else if (e.key === 'z' || e.key === 'Z') setFillMode(!fillMode);
   else if (e.key === 's' || e.key === 'S') setSyncMode(!syncMode);
+  else if (e.key === 'q' || e.key === 'Q') setQuality(!smallSource);
 });
 
 // ── Mode switching ──────────────────────────────────────────────────────────
@@ -1054,6 +1083,20 @@ function setFillMode(on: boolean): void {
     if (contain && layers.indexOf(l) === active) void l.ambient.play().catch(() => {});
   }
   toast(on ? 'fill on' : 'fill off');
+}
+
+function setQuality(small: boolean): void {
+  smallSource = small;
+  qualityPinned = true;
+  troubleCount = 0;
+  cleanClips = 0;
+  storeFlag('everdays:small', small);
+  syncUrl();
+  renderModes();
+  // Swap the on-deck layer over now; the clip on screen plays out as it is.
+  const partner = layers[1 - active];
+  if (partner.clip) preload(partner, partner.clip);
+  toast(small ? '480p' : '720p');
 }
 
 function setSyncMode(on: boolean): void {
