@@ -451,6 +451,7 @@ let pendingPreload = 0; // timeout id for the deferred partner preload
 let readyTimer = 0; // fallback timeout for a swap waiting on canplay
 let swapTimer = 0; // precise, schedule-accurate trigger for the next crossfade
 let fading = false; // true for the length of a crossfade
+let holdTimer = 0; // drops the outgoing layer once the incoming one covers it
 let swapPending = false; // a swap is waiting for its layer to become playable
 let swapping = false; // guards the pre-emptive crossfade against double-firing
 let started = false; // true once anything has been put on screen
@@ -674,7 +675,17 @@ function activate(l: Layer): void {
   // class and then removing it from the same node — which happens the moment a
   // layer is activated twice — left *neither* layer visible, i.e. a black wall
   // with both clips still playing behind it.
-  if (partner !== l) partner.root.classList.remove('active');
+  //
+  // The outgoing layer is held fully opaque underneath while the incoming one
+  // fades in over it, so the dissolve doesn't dip dark in the middle. It's
+  // dropped once the incoming layer covers it completely.
+  if (partner !== l) {
+    partner.root.classList.remove('active');
+    partner.root.classList.add('holding');
+    window.clearTimeout(holdTimer);
+    holdTimer = window.setTimeout(() => partner.root.classList.remove('holding'), FADE_MS);
+  }
+  l.root.classList.remove('holding');
   l.root.classList.add('active');
 
   tryPlay(l);
@@ -904,8 +915,12 @@ function holdSync(): void {
 
   const drift = l.main.currentTime - due.offset; // positive = running ahead
   if (Math.abs(drift) >= DRIFT_RESEEK_S) {
+    // Never seek the layer that's on screen. A seek is an instant jump to a
+    // different frame, and on a library full of white-backed clips that reads
+    // as a flash. resyncNow() lands the same correction on the hidden layer
+    // and crossfades to it, so the picture only ever moves smoothly.
     setRate(l, 1);
-    seekTo(l, due.offset);
+    resyncNow();
     return;
   }
   if (Math.abs(drift) <= DRIFT_DEADBAND_S) {

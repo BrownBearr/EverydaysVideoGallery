@@ -46,17 +46,33 @@
     }
 
     /* Two stacked layers; we crossfade between them on each swap so a clip
-       never pops in mid-decode. Only the active layer is opaque. */
+       never pops in mid-decode.
+       Only the incoming layer animates. Fading both at once looks like the
+       obvious way to dissolve, but stacked elements composite — the outgoing
+       layer's contribution gets multiplied by the incoming layer's
+       transparency, so the middle of every transition lands 25% darker than
+       either clip. Holding the outgoing one opaque underneath and fading the
+       incoming one in on top gives a true dissolve with no dip. */
     .layer {
       position: absolute;
       inset: 0;
       background: #000;
       opacity: 0;
+      z-index: 0;
       transition: opacity var(--fade) ease-in-out;
     }
 
+    /* .active is the layer that owns the screen; .holding is the one still
+       being dissolved away underneath it. */
     .layer.active {
       opacity: 1;
+      z-index: 2;
+    }
+
+    .layer.holding {
+      opacity: 1;
+      z-index: 1;
+      transition: none;
     }
 
     .layer video {
